@@ -3,7 +3,7 @@
 import socket
 
 # === CONFIGURATION ===
-ESP_HOST = '10.186.148.213'  # <-- CHANGE THIS to your ESP8266 IP or 'echo23.local' if mDNS works
+ESP_HOST = '10.201.74.213'  # <-- CHANGE THIS to your ESP8266 IP or 'echo23.local' if mDNS works
 ESP_PORT = 23               # Must match the port used by ESP (default: 23)
 
 # === CONNECT TO SERVER ===

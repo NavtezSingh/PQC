@@ -10,8 +10,8 @@
 #include <algorithm>  // std::min
 
 #ifndef STASSID
-#define STASSID "Navtez"
-#define STAPSK "dontconnect1"
+#define STASSID "Redmi 13 5G"
+#define STAPSK "987654321"
 #endif
 
 constexpr int port = 23;
