@@ -55,25 +55,27 @@ void setup() {
 }
 
 
-void loop() {
 
+void loop() {
   MDNS.update();
 
   static uint32_t tot = 0;
   static uint32_t cnt = 0;
   if (test && cnt) {
-    
     Serial.printf("measured-block-size=%u min-free-stack=%u", tot / cnt, ESP.getFreeContStack());
     if (t == 2 && sizes[s]) { Serial.printf(" (blocks: at most %d bytes)", sizes[s]); }
     if (t == 3 && sizes[s]) { Serial.printf(" (blocks: exactly %d bytes)", sizes[s]); }
     if (t == 3 && !sizes[s]) { Serial.printf(" (blocks: any size)"); }
     Serial.printf("\n");
+    tot = cnt = 0;
   }
 
-  // check if there are any new clients
   if (server.hasClient()) {
+    if (client && client.connected()) {
+      client.stop(); // disconnect old client if any
+    }
     client = server.accept();
-    Serial.println("New client");
+    Serial.println("New client connected");
   }
 
   if (Serial.available()) {
@@ -82,88 +84,75 @@ void loop() {
       case '1':
         if (t != 1) s = 0;
         t = 1;
-        Serial.println("byte-by-byte (watch then press 2, 3 or 4)");
+        Serial.println("Mode 1: byte-by-byte (visible in Serial)");
         break;
       case '2':
         if (t != 2) s = 1;
         t = 2;
-        Serial.printf("through buffer (watch then press 2 again, or 1, 3 or 4)\n");
+        Serial.printf("Mode 2: buffered (max %d bytes)\n", sizes[s]);
         break;
       case '3':
         if (t != 3) s = 0;
         t = 3;
-        Serial.printf("direct access (sendAvailable - watch then press 3 again, or 1, 2 or 4)\n");
+        Serial.printf("Mode 3: sendAvailable (no Serial log!)\n");
         break;
       case '4':
         t = 4;
-        Serial.printf("direct access (sendAll - close peer to stop, then press 1, 2 or 3 before restarting peer)\n");
+        Serial.println("Mode 4: sendAll (no Serial log, blocks until disconnect)");
         break;
     }
-    tot = cnt = 0;
     ESP.resetFreeContStack();
   }
 
   enoughMs.reset(breathMs);
 
-  if (t == 1) {
-  while (client.available() && client.availableForWrite() && !enoughMs) {
-    uint8_t c = client.read();
-    client.write(c);  // echo back
-    Serial.write(c);  // 👈 LOG to Serial
-    cnt++;
-    tot += 1;
+  if (!client || !client.connected()) {
+    return;
   }
-}
 
-  else if (t == 2) {
-  while (client.available() && client.availableForWrite() && !enoughMs) {
-    size_t maxTo = std::min(client.available(), client.availableForWrite());
-    maxTo = std::min(maxTo, sizes[s]);
-    uint8_t buf[maxTo];
-    size_t tcp_got = client.read(buf, maxTo);
-    if (tcp_got > 0) {
-      // Echo back
-      size_t tcp_sent = client.write(buf, tcp_got);
-      // Log to Serial
-      Serial.write(buf, tcp_got);  // 👈 LOG actual data
-      if (tcp_sent != tcp_got) {
-        Serial.printf("len mismatch: read:%zd sent:%zd\n", tcp_got, tcp_sent);
-      }
-      tot += tcp_sent;
+  if (t == 1) {
+    while (client.available() && client.availableForWrite() && !enoughMs) {
+      uint8_t c = client.read();
+      client.write(c);
+      Serial.write(c); // 👈 Visible in Serial Monitor!
+      Serial.write('\t'); 
+      if (c == '\n') Serial.flush(); // optional: flush on newline
       cnt++;
+      tot++;
     }
   }
-}
+
+  else if (t == 2) {
+    while (client.available() && client.availableForWrite() && !enoughMs) {
+      size_t avail = static_cast<size_t>(client.available());
+      size_t availWrite = static_cast<size_t>(client.availableForWrite());
+      size_t maxTo = std::min(std::min(avail, availWrite), sizes[s]);
+      uint8_t buf[maxTo];
+      size_t got = client.read(buf, maxTo);
+      if (got > 0) {
+        client.write(buf, got);
+        Serial.write(buf, got);  // 👈 Visible!
+        Serial.write('\t');
+        if (buf[got - 1] == '\n') Serial.flush();
+        tot += got;
+        cnt++;
+      }
+    }
+  }
 
   else if (t == 3) {
-    // stream to print, possibly with only one copy
+    // No easy way to log — use Mode 1 or 2 for visibility
     if (sizes[s]) {
       tot += client.sendSize(&client, sizes[s]);
     } else {
       tot += client.sendAvailable(&client);
     }
     cnt++;
-
-    switch (client.getLastSendReport()) {
-      case Stream::Report::Success: break;
-      case Stream::Report::TimedOut: Serial.println("Stream::send: timeout"); break;
-      case Stream::Report::ReadError: Serial.println("Stream::send: read error"); break;
-      case Stream::Report::WriteError: Serial.println("Stream::send: write error"); break;
-      case Stream::Report::ShortOperation: Serial.println("Stream::send: short transfer"); break;
-    }
+    // Handle send report if needed...
   }
 
   else if (t == 4) {
-    // stream to print, possibly with only one copy
-    tot += client.sendAll(&client);  // this one might not exit until peer close
+    tot += client.sendAll(&client);
     cnt++;
-
-    switch (client.getLastSendReport()) {
-      case Stream::Report::Success: break;
-      case Stream::Report::TimedOut: Serial.println("Stream::send: timeout"); break;
-      case Stream::Report::ReadError: Serial.println("Stream::send: read error"); break;
-      case Stream::Report::WriteError: Serial.println("Stream::send: write error"); break;
-      case Stream::Report::ShortOperation: Serial.println("Stream::send: short transfer"); break;
-    }
   }
 }
