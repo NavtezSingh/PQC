@@ -5,7 +5,7 @@ extern "C" {
 
 // 👇 REPLACE WITH THE OTHER ESP'S MAC ADDRESS (in hex)
 // Example: if THIS is ESP1, put ESP2's MAC here
-uint8_t peerMac[] = {0x80, 0x7D, 0x3A, 0x6E, 0xED, 0xFC}; // ← CHANGE THIS!
+uint8_t peerMac[] = {0x84, 0xF3, 0xEB, 0xB7, 0x51, 0xBC}; // ← CHANGE THIS!
 
 // Buffer to hold incoming messages
 #define MAX_MSG_LEN 250
