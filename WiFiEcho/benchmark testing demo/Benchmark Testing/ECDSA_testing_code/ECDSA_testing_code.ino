@@ -6,6 +6,7 @@
 extern "C" {
   #include "osapi.h"
 }
+
 int my_rng(uint8_t *dest, unsigned size) {
   for (unsigned i = 0; i < size; ++i) {
     dest[i] = os_random() & 0xFF;
@@ -14,7 +15,7 @@ int my_rng(uint8_t *dest, unsigned size) {
 }
 
 // Benchmark config
-#define TOTAL_RUNS 100  // Start with 100; increase later if stable
+#define TOTAL_RUNS 1000  // Can adjust later
 volatile int run = 0;
 uint32_t total_sign = 0;
 uint32_t total_verify = 0;
@@ -64,7 +65,12 @@ void loop() {
         }
         total_sign += (micros() - start);
         run++;
-        // Do NOT add delay here — loop() will be called again immediately
+
+        // Print progress every 50 runs (outside timing window)
+        if (run % 50 == 0) {
+          Serial.printf("[SIGN] Completed %d / %d\n", run, TOTAL_RUNS);
+        }
+
         yield(); // Allow background tasks
       } else {
         Serial.printf("Signing done (%d runs)\n", TOTAL_RUNS);
@@ -83,6 +89,12 @@ void loop() {
         }
         total_verify += (micros() - start);
         run++;
+
+        // Print progress every 50 runs
+        if (run % 50 == 0) {
+          Serial.printf("[VERIFY] Completed %d / %d\n", run, TOTAL_RUNS);
+        }
+
         yield();
       } else {
         float avg_sign = (float)total_sign / TOTAL_RUNS;
